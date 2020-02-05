@@ -1,0 +1,6 @@
+*.json
+data/
+Generating_Flickrwords_mfcc/mfcc/
+.DS_Store
+__pycache__
+
