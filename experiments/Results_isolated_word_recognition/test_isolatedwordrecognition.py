@@ -4,22 +4,28 @@ import tables
 import argparse
 import torch
 import sys
+import json
 
 sys.path.append('/Users/sebastiaanscholten/Documents/speech2image-master/PyTorch/functions')
+sys.path.append('../')
 
-from trainer import flickr_trainer
+from mytrainer import personaltrainer
+from helper import create_noun_set
+import pandas as pd
 from encoders import img_encoder, audio_rnn_encoder
-from minibatchers import iterate_audio
+from data_split import split_data_flickr
 
-class personaltrainer(flickr_trainer):
-    def audio_batcher(self, data, batch_size, shuffle):
-        return iterate_audio(data, batch_size, self.vis, self.cap, shuffle)
+
+
 
 
 parser = argparse.ArgumentParser(description='Create and run an articulatory feature classification DNN')
 
 # args concerning file location
 parser.add_argument('-data_loc', type = str, default = '/Users/sebastiaanscholten/Documents/speech2image-master/experiments/Generating_Flickrwords_mfcc/mfcc/words_mfcc_features.h5')
+
+parser.add_argument('-flickr_loc', type = str, default = '/Users/sebastiaanscholten/Documents/speech2image-master/preprocessing/prep_data/flickr_features_27jan_fixed.h5',
+                    help = 'location of the Flickr feature file, default: /prep_data/flickr_features.h5')
 
 parser.add_argument('-split_loc', type=str,
                     default='/Users/sebastiaanscholten/Documents/speech2image-master/preprocessing/testfolder2/test/dataset.json',
@@ -52,7 +58,7 @@ image_config = {'linear': {'in_size': 2048, 'out_size': out_size}, 'norm': True}
 
 # open the data file
 data_file = tables.open_file(args.data_loc, mode='r+')
-
+flickr_file = tables.open_file(args.flickr_loc, mode="r+")
 # check if cuda is availlable and user wants to run on gpu
 cuda = args.cuda and torch.cuda.is_available()
 if cuda:
@@ -67,11 +73,22 @@ def iterate_data(h5_file):
         yield x
 
 
-f_nodes = [node for node in iterate_data(data_file)]
+nouns_txt = pd.read_csv("/Users/sebastiaanscholten/Documents/speech2image-master/experiments/data/testwords.txt", header=None)
+nouns = nouns_txt.iloc[:,0].values.tolist()
+
+f_nodes_mfcc = create_noun_set(nouns,data_file)
+
+f_nodes_flickr = [node for node in iterate_data(flickr_file)]
 
 # split the database into train test and validation sets. default settings uses the json file
 # with the karpathy split
-test = f_nodes[1:100]
+train, test, val = split_data_flickr(f_nodes_flickr, args.split_loc)
+
+
+mfcc_test = f_nodes_mfcc
+images_test = test
+
+
 #####################################################
 
 # network modules
@@ -89,7 +106,8 @@ caption_models.sort()
 
 # create a trainer with just the evaluator for the purpose of testing a pretrained model
 trainer = personaltrainer(img_net, cap_net, args.visual, args.cap)
-trainer.set_audio_batcher()
+trainer.set_only_audio_batcher()
+trainer.set_only_image_batcher()
 # optionally use cuda
 
 if cuda:
@@ -104,5 +122,14 @@ for img, cap in zip(img_models, caption_models):
 
     # calculate the recall@n
     trainer.set_epoch(epoch)
-    trainer.recall_at_n(test, args.batch_size, prepend='test')
 
+    resultsat10, whichimages = trainer.word_precision_at_n(mfcc_test, images_test, 10, args.batch_size)
+    for idx,result in enumerate(resultsat10):
+        print("For word: ", mfcc_test[idx]._v_name.replace('flickr_', ''), "we retrieved: ", result, "\n")
+        for res in whichimages[idx]:
+            print(images_test[res]._v_name.replace('flickr_', '')+".jpg")
+
+
+
+    print("done!")
+    print("okay")

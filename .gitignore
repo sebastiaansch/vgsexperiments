@@ -1,7 +1,8 @@
 *.json
-data/
-Generating_Flickrwords_mfcc/mfcc/
-.DS_Store
-__pycache__
-Generating_Flickrwords_audio/Flickr8kWordsMP3/
-Generating_Flickrwords_audio/Flickr8kWordsWAV/
+experiments/data/
+experiments/Generating_Flickrwords_mfcc/mfcc/
+experiments/Generating_Flickrwords_audio/Flickr8kWordsMP3/
+experiments/Generating_Flickrwords_audio/Flickr8kWordsWAV/
+experiments/notebooks/output_file/
+mytrainer/__pycache__/
+
